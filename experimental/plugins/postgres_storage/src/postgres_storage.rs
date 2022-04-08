@@ -2076,7 +2076,7 @@ impl WalletStorageType for PostgresStorageType {
             .map_or(Ok(None), |v| v.map(Some))
             .map_err(|err| CommonError::InvalidStructure(format!("Cannot deserialize credentials: {:?}", err)))?;
 
-        let config = match config
+        let mut config = match config
         {
             Some(config) => config,
             None => return Err(WalletStorageError::ConfigError)
@@ -2085,6 +2085,8 @@ impl WalletStorageType for PostgresStorageType {
             Some(credentials) => credentials,
             None => return Err(WalletStorageError::ConfigError)
         };
+
+        config.init_tls();
 
         // initialize using the global selected_strategy object
         let r1 = SELECTED_STRATEGY.read().unwrap();
