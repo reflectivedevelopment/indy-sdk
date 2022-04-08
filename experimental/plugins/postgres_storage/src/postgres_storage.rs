@@ -400,6 +400,8 @@ pub struct PostgresConfig {
 impl PostgresConfig {
 
     fn init_tls(&mut self) {
+        debug!("initializing postgresql builder");
+
         let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
 
         if self.tls_ca.is_some() {
