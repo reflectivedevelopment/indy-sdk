@@ -413,6 +413,7 @@ impl PostgresConfig {
     }
 
     fn tls(&self) -> postgres::TlsMode {
+        debug!("tls");
         match &self.tls {
             Some(tls) => match tls.as_ref() {
                 "None" => postgres::TlsMode::None,
