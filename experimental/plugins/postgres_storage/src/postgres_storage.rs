@@ -378,6 +378,7 @@ impl StorageIterator for PostgresStorageIterator {
 pub struct PostgresConfig {
     url: String,
     tls: Option<String>,
+    tls_ca: Option<String>,
     // default off
     max_connections: Option<u32>,
     // default 5
@@ -391,18 +392,21 @@ pub struct PostgresConfig {
     database_name: Option<String>,   // default _WALLET_DB
     
     // For TLS
-    // #[serde(skip)] 
     #[serde(skip)]
-    #[serde(default = "PostgresConfig::negotiator")]
-    negotiator: OpenSsl,
+    negotiator: Option<OpenSsl>,
+
 }
 
 impl PostgresConfig {
 
-    fn negotiator() -> OpenSsl {
-        let builder = SslConnector::builder(SslMethod::tls()).unwrap();
+    fn init_tls(&mut self) {
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
 
-        return OpenSsl::from(builder.build());
+        if self.tls_ca.is_some() {
+            builder.set_ca_file(self.tls_ca.as_ref().unwrap());
+        }
+
+        self.negotiator = Some(OpenSsl::from(builder.build()));
     }
 
     fn tls(&self) -> postgres::TlsMode {
@@ -410,8 +414,8 @@ impl PostgresConfig {
             Some(tls) => match tls.as_ref() {
                 "None" => postgres::TlsMode::None,
                 // TODO add tls support for connecting to postgres db
-                "Prefer" => postgres::TlsMode::Prefer(&self.negotiator),
-                "Require" => postgres::TlsMode::Require(&self.negotiator),
+                "Prefer" => postgres::TlsMode::Prefer(self.negotiator.as_ref().unwrap()),
+                "Require" => postgres::TlsMode::Require(self.negotiator.as_ref().unwrap()),
                 _ => postgres::TlsMode::None
             },
             None => postgres::TlsMode::None
@@ -419,7 +423,11 @@ impl PostgresConfig {
     }
     fn r2d2_tls(&self) -> TlsMode {
 
-        let builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+
+        if self.tls_ca.is_some() {
+            builder.set_ca_file(self.tls_ca.as_ref().unwrap());
+        }
 
         let negotiator = OpenSsl::from(builder.build());
 
@@ -1879,7 +1887,7 @@ impl WalletStorageType for PostgresStorageType {
             .map_or(Ok(None), |v| v.map(Some))
             .map_err(|err| CommonError::InvalidStructure(format!("Cannot deserialize credentials: {:?}", err)))?;
 
-        let config = match config {
+        let mut config = match config {
             Some(config) => config,
             None => return Err(WalletStorageError::ConfigError)
         };
@@ -1887,6 +1895,8 @@ impl WalletStorageType for PostgresStorageType {
             Some(credentials) => credentials,
             None => return Err(WalletStorageError::ConfigError)
         };
+
+        config.init_tls();
 
         match config.wallet_scheme {
             Some(scheme) => match scheme {
