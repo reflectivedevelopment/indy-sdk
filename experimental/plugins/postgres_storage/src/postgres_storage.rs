@@ -406,6 +406,7 @@ impl PostgresConfig {
             builder.set_ca_file(self.tls_ca.as_ref().unwrap());
         }
 
+        debug!("initializing postgresql negotiator");
         self.negotiator = Some(OpenSsl::from(builder.build()));
     }
 
